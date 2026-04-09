@@ -9,6 +9,7 @@
 
 # Ignore build outputs
 *.o
+*.a
 .*.o.d
 lib/
 
