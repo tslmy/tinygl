@@ -262,18 +262,20 @@ void glReadPixels(GLint x,
 {
     GLContext *c = gl_get_context();
 #include "error_check.h"
+
+    /* Accept GL_UNSIGNED_BYTE (used by raylib's rlReadScreenPixels) in addition
+     * to the original GL_UNSIGNED_INT types. */
+    GLint type_ok = 0;
+#if TGL_FEATURE_RENDER_BITS == 32
+    type_ok = (type == GL_UNSIGNED_INT || type == GL_UNSIGNED_INT_8_8_8_8 || type == GL_UNSIGNED_BYTE);
+#elif TGL_FEATURE_RENDER_BITS == 16
+    type_ok = (type == GL_UNSIGNED_SHORT || type == GL_UNSIGNED_SHORT_5_6_5 || type == GL_UNSIGNED_BYTE);
+#endif
+
     if (c->readbuffer != GL_FRONT ||
         (format != GL_RGBA && format != GL_RGB &&
          format != GL_DEPTH_COMPONENT) ||
-#if TGL_FEATURE_RENDER_BITS == 32
-        (type != GL_UNSIGNED_INT && type != GL_UNSIGNED_INT_8_8_8_8)
-#elif TGL_FEATURE_RENDER_BITS == 16
-        (type != GL_UNSIGNED_SHORT && type != GL_UNSIGNED_SHORT_5_6_5)
-#else
-#error "Unsupported TGL_FEATURE_RENDER_BITS"
-#endif
-
-    ) {
+        !type_ok) {
 #if TGL_HAS(ERROR_CHECK)
 #define ERROR_FLAG GL_INVALID_OPERATION
 #include "error_check.h"
@@ -281,7 +283,43 @@ void glReadPixels(GLint x,
         return;
 #endif
     }
-    /* TODO: implement read pixels.*/
+
+#if TGL_FEATURE_RENDER_BITS == 32
+    if (data == NULL) return;
+    ZBuffer *zb = c->zb;
+    GLubyte *dst = (GLubyte *)data;
+
+    for (GLint j = 0; j < height; j++) {
+        /* OpenGL y=0 is bottom; TinyGL pbuf y=0 is top */
+        GLint src_y = (zb->ysize - 1) - (y + j);
+        if (src_y < 0 || src_y >= zb->ysize) continue;
+        PIXEL *row = zb->pbuf + src_y * zb->xsize;
+
+        for (GLint i = 0; i < width; i++) {
+            GLint src_x = x + i;
+            if (src_x < 0 || src_x >= zb->xsize) continue;
+            PIXEL p = row[src_x];
+            /* TinyGL 32-bit pixel layout: 0xAARRGGBB */
+            GLubyte r = (p >> 16) & 0xFF;
+            GLubyte g = (p >>  8) & 0xFF;
+            GLubyte b =  p        & 0xFF;
+            GLubyte a = (p >> 24) & 0xFF;
+            if (a == 0) a = 255;  /* default opaque if alpha was never set */
+
+            if (type == GL_UNSIGNED_BYTE) {
+                if (format == GL_RGBA) {
+                    *dst++ = r; *dst++ = g; *dst++ = b; *dst++ = a;
+                } else if (format == GL_RGB) {
+                    *dst++ = r; *dst++ = g; *dst++ = b;
+                }
+            } else {
+                /* GL_UNSIGNED_INT: write as packed 32-bit */
+                ((GLuint *)dst)[0] = p;
+                dst += 4;
+            }
+        }
+    }
+#endif
 }
 
 void glFinish()
