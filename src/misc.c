@@ -292,19 +292,25 @@ void glReadPixels(GLint x,
     for (GLint j = 0; j < height; j++) {
         /* OpenGL y=0 is bottom; TinyGL pbuf y=0 is top */
         GLint src_y = (zb->ysize - 1) - (y + j);
-        if (src_y < 0 || src_y >= zb->ysize) continue;
-        PIXEL *row = zb->pbuf + src_y * zb->xsize;
 
         for (GLint i = 0; i < width; i++) {
             GLint src_x = x + i;
-            if (src_x < 0 || src_x >= zb->xsize) continue;
-            PIXEL p = row[src_x];
-            /* TinyGL 32-bit pixel layout: 0xAARRGGBB */
-            GLubyte r = (p >> 16) & 0xFF;
-            GLubyte g = (p >>  8) & 0xFF;
-            GLubyte b =  p        & 0xFF;
-            GLubyte a = (p >> 24) & 0xFF;
-            if (a == 0) a = 255;  /* default opaque if alpha was never set */
+            GLubyte r = 0, g = 0, b = 0, a = 255;
+
+            /* Read pixel if in bounds; write black for out-of-bounds so
+             * the output stride stays consistent (xsize may differ from
+             * requested width due to TinyGL's & ~3 rounding). */
+            if (src_y >= 0 && src_y < zb->ysize &&
+                src_x >= 0 && src_x < zb->xsize) {
+                PIXEL *row = zb->pbuf + src_y * zb->xsize;
+                PIXEL p = row[src_x];
+                /* TinyGL 32-bit pixel layout: 0xAARRGGBB */
+                r = (p >> 16) & 0xFF;
+                g = (p >>  8) & 0xFF;
+                b =  p        & 0xFF;
+                a = (p >> 24) & 0xFF;
+                if (a == 0) a = 255;  /* default opaque if alpha was never set */
+            }
 
             if (type == GL_UNSIGNED_BYTE) {
                 if (format == GL_RGBA) {
@@ -314,7 +320,7 @@ void glReadPixels(GLint x,
                 }
             } else {
                 /* GL_UNSIGNED_INT: write as packed 32-bit */
-                ((GLuint *)dst)[0] = p;
+                ((GLuint *)dst)[0] = (a << 24) | (r << 16) | (g << 8) | b;
                 dst += 4;
             }
         }
