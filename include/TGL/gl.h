@@ -4,7 +4,7 @@
 /* prefix the OpenGL function names with "t" to avoid conflicts with * system
  * OpenGL definitions
  */
-#define TGL_PREFIX 1
+#define TGL_PREFIX 0
 
 /*
  * The following constants come from Mesa 3D Graphics Library.
