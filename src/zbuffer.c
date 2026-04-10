@@ -5,6 +5,14 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* NEON SIMD for fast buffer fills on ARMv7 */
+#if defined(__ARM_NEON) || defined(__ARM_NEON__)
+#include <arm_neon.h>
+#define USE_NEON 1
+#else
+#define USE_NEON 0
+#endif
+
 #include "msghandling.h"
 #include "zbuffer.h"
 
@@ -317,9 +325,24 @@ void ZB_copyFrameBuffer(ZBuffer *zb, void *buf, GLint linesize)
 
 /*
  * adr must be aligned on an 'int'
+ * Fill 16-bit values (used for Z-buffer clear).
+ * NEON path processes 16 values (32 bytes) per iteration.
  */
 static void memset_s(void *adr, GLint val, GLint count)
 {
+#if USE_NEON
+    GLushort *q = (GLushort *)adr;
+    uint16x8_t vval = vdupq_n_u16((uint16_t)val);
+    GLint n = count >> 4;  /* 16 values per iteration */
+    for (GLint i = 0; i < n; i++) {
+        vst1q_u16(q,     vval);
+        vst1q_u16(q + 8, vval);
+        q += 16;
+    }
+    n = count & 15;
+    for (GLint i = 0; i < n; i++)
+        *q++ = val;
+#else
     GLint i, n, v;
     GLuint *p;
     GLushort *q;
@@ -340,11 +363,30 @@ static void memset_s(void *adr, GLint val, GLint count)
     n = count & 7;
     for (i = 0; i < n; i++)
         *q++ = val;
+#endif
 }
 
-/* Used in 32 bit mode*/
+/*
+ * Fill 32-bit values (used for color buffer clear).
+ * NEON path processes 16 values (64 bytes) per iteration.
+ */
 static void memset_l(void *adr, GLint val, GLint count)
 {
+#if USE_NEON
+    GLuint *p = (GLuint *)adr;
+    uint32x4_t vval = vdupq_n_u32((uint32_t)val);
+    GLint n = count >> 4;  /* 16 values per iteration */
+    for (GLint i = 0; i < n; i++) {
+        vst1q_u32(p,      vval);
+        vst1q_u32(p + 4,  vval);
+        vst1q_u32(p + 8,  vval);
+        vst1q_u32(p + 12, vval);
+        p += 16;
+    }
+    n = count & 15;
+    for (GLint i = 0; i < n; i++)
+        *p++ = val;
+#else
     GLint i, n, v;
     GLuint *p;
     p = adr;
@@ -360,6 +402,7 @@ static void memset_l(void *adr, GLint val, GLint count)
     n = count & 3;
     for (i = 0; i < n; i++)
         *p++ = val;
+#endif
 }
 
 void ZB_clear(ZBuffer *zb,
