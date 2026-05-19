@@ -259,17 +259,46 @@ void ZB_fillTriangleFlat_DT1_DW1(ZBuffer *zb,
                 ((GLuint)((p2->a >> 16) & 0xFF) << 24);                      \
     }
 
+#ifdef __ARM_NEON
+#define DRAW_LINE()                                              \
+    {                                                            \
+        register PIXEL *pp;                                      \
+        register GLushort *pz;                                   \
+        register GLint n;                                        \
+        n = (x2 >> 16) - x1;                                    \
+        pp = (PIXEL *)pp1 + x1;                                  \
+        pz = pz1 + x1;                                          \
+        if (n >= 0) {                                            \
+            if (sfactor == GL_SRC_ALPHA &&                        \
+                dfactor == GL_ONE_MINUS_SRC_ALPHA)                \
+                neon_flat_blend_srcalpha_dt1_dw1(pp, pz, n + 1,  \
+                    color, z1, dzdx);                            \
+            else {                                               \
+                GLuint zbblendeq_ = zbblendeq;                   \
+                GLuint z = z1;                                   \
+                while (n >= 0) {                                 \
+                    GLuint zz = z >> ZB_POINT_Z_FRAC_BITS;       \
+                    if (zz >= *pz) {                             \
+                        TGL_BLEND_FUNC(color, (*pp));            \
+                        *pz = (GLushort)zz;                      \
+                    }                                            \
+                    z += dzdx; pp++; pz++; n--;                  \
+                }                                                \
+                (void)zbblendeq_;                                \
+            }                                                    \
+        }                                                        \
+    }
+#else
 #define PUT_PIXEL(_a)                                   \
     {                                                   \
         register GLuint zz = z >> ZB_POINT_Z_FRAC_BITS; \
-        /* DT=1: test depth */                          \
         if ((zz >= pz[_a]) STIPTEST(_a)) {              \
             TGL_BLEND_FUNC(color, (pp[_a]))             \
-            /* DW=1: always write depth */              \
             pz[_a] = zz;                                \
         }                                               \
         z += dzdx;                                      \
     }
+#endif
 
 #include "ztriangle.h"
 }
@@ -377,6 +406,20 @@ void ZB_fillTriangleFlatNOBLEND_DT1_DW0(ZBuffer *zb,
     {               \
     }
 
+#ifdef __ARM_NEON
+#define DRAW_LINE()                                              \
+    {                                                            \
+        register PIXEL *pp;                                      \
+        register GLushort *pz;                                   \
+        register GLint n;                                        \
+        n = (x2 >> 16) - x1;                                    \
+        pp = (PIXEL *)pp1 + x1;                                  \
+        pz = pz1 + x1;                                          \
+        if (n >= 0)                                              \
+            neon_flat_noblend_dt1_scanline(pp, pz, n + 1,        \
+                color, z1, dzdx);                                \
+    }
+#else
 #define PUT_PIXEL(_a)                                   \
     {                                                   \
         register GLuint zz = z >> ZB_POINT_Z_FRAC_BITS; \
@@ -385,6 +428,7 @@ void ZB_fillTriangleFlatNOBLEND_DT1_DW0(ZBuffer *zb,
         }                                               \
         z += dzdx;                                      \
     }
+#endif
 
 #include "ztriangle.h"
 }
@@ -413,6 +457,20 @@ void ZB_fillTriangleFlatNOBLEND_DT1_DW1(ZBuffer *zb,
     {               \
     }
 
+#ifdef __ARM_NEON
+#define DRAW_LINE()                                              \
+    {                                                            \
+        register PIXEL *pp;                                      \
+        register GLushort *pz;                                   \
+        register GLint n;                                        \
+        n = (x2 >> 16) - x1;                                    \
+        pp = (PIXEL *)pp1 + x1;                                  \
+        pz = pz1 + x1;                                          \
+        if (n >= 0)                                              \
+            neon_flat_noblend_dt1_dw1_scanline(pp, pz, n + 1,    \
+                color, z1, dzdx);                                \
+    }
+#else
 #define PUT_PIXEL(_a)                                   \
     {                                                   \
         register GLuint zz = z >> ZB_POINT_Z_FRAC_BITS; \
@@ -422,6 +480,7 @@ void ZB_fillTriangleFlatNOBLEND_DT1_DW1(ZBuffer *zb,
         }                                               \
         z += dzdx;                                      \
     }
+#endif
 
 #include "ztriangle.h"
 }
@@ -746,6 +805,20 @@ void ZB_fillTriangleSmoothNOBLEND_DT1_DW0(ZBuffer *zb,
     {               \
     }
 
+#ifdef __ARM_NEON
+#define DRAW_LINE()                                              \
+    {                                                            \
+        register PIXEL *pp;                                      \
+        register GLushort *pz;                                   \
+        register GLint n;                                        \
+        n = (x2 >> 16) - x1;                                    \
+        pp = (PIXEL *)pp1 + x1;                                  \
+        pz = pz1 + x1;                                          \
+        if (n >= 0)                                              \
+            neon_smooth_noblend_dt1_scanline(pp, pz, n + 1,      \
+                r1, g1, b1, drdx, dgdx, dbdx, z1, dzdx);        \
+    }
+#else
 #define PUT_PIXEL(_a)                                   \
     {                                                   \
         register GLuint zz = z >> ZB_POINT_Z_FRAC_BITS; \
@@ -757,6 +830,7 @@ void ZB_fillTriangleSmoothNOBLEND_DT1_DW0(ZBuffer *zb,
         or1 += drdx;                                    \
         ob1 += dbdx;                                    \
     }
+#endif
 
 #include "ztriangle.h"
 }
@@ -785,6 +859,20 @@ void ZB_fillTriangleSmoothNOBLEND_DT1_DW1(ZBuffer *zb,
     {               \
     }
 
+#ifdef __ARM_NEON
+#define DRAW_LINE()                                              \
+    {                                                            \
+        register PIXEL *pp;                                      \
+        register GLushort *pz;                                   \
+        register GLint n;                                        \
+        n = (x2 >> 16) - x1;                                    \
+        pp = (PIXEL *)pp1 + x1;                                  \
+        pz = pz1 + x1;                                          \
+        if (n >= 0)                                              \
+            neon_smooth_noblend_dt1_dw1_scanline(pp, pz, n + 1,  \
+                r1, g1, b1, drdx, dgdx, dbdx, z1, dzdx);        \
+    }
+#else
 #define PUT_PIXEL(_a)                                   \
     {                                                   \
         register GLuint zz = z >> ZB_POINT_Z_FRAC_BITS; \
@@ -797,6 +885,7 @@ void ZB_fillTriangleSmoothNOBLEND_DT1_DW1(ZBuffer *zb,
         or1 += drdx;                                    \
         ob1 += dbdx;                                    \
     }
+#endif
 
 #include "ztriangle.h"
 }

@@ -522,5 +522,230 @@ static inline void neon_flat_blend_srcalpha_dt1(PIXEL *pp, GLushort *pz,
     }
 }
 
+/*
+ * Flat-shaded scanline with depth test + depth WRITE (DT1_DW1).
+ * Used by shadows. Same as srcalpha_dt1 but writes z-buffer on pass.
+ */
+static inline void neon_flat_blend_srcalpha_dt1_dw1(PIXEL *pp, GLushort *pz,
+                                                    GLint count, GLuint color,
+                                                    GLuint z_start, GLint dzdx) {
+    uint8_t sa = (color >> 24) & 0xFF;
+    uint8_t sr = (color >> 16) & 0xFF;
+    uint8_t sg = (color >> 8) & 0xFF;
+    uint8_t sb = color & 0xFF;
+    uint8_t inv_sa = 255 - sa;
+
+    GLuint z = z_start;
+
+    while (count > 0) {
+        GLuint zz = z >> ZB_POINT_Z_FRAC_BITS;
+        if (zz >= *pz) {
+            GLuint dest = *pp;
+            GLuint dr = (dest >> 16) & 0xFF;
+            GLuint dg = (dest >> 8) & 0xFF;
+            GLuint db = dest & 0xFF;
+            GLuint rr = ((GLuint)sr * sa + dr * inv_sa + 128) >> 8;
+            GLuint rg = ((GLuint)sg * sa + dg * inv_sa + 128) >> 8;
+            GLuint rb = ((GLuint)sb * sa + db * inv_sa + 128) >> 8;
+            *pp = (rr << 16) | (rg << 8) | rb;
+            *pz = (GLushort)zz;
+        }
+        z += dzdx;
+        pp++;
+        pz++;
+        count--;
+    }
+}
+
+/*
+ * Smooth-shaded scanline with depth test + depth WRITE (DT1_DW1).
+ * Same branchless NEON as neon_smooth_dt1_scanline but also writes z-buffer.
+ */
+static inline void neon_smooth_dt1_dw1_scanline(PIXEL *pp, GLushort *pz,
+                                                GLint count,
+                                                GLint r_start, GLint g_start,
+                                                GLint b_start,
+                                                GLint drdx, GLint dgdx,
+                                                GLint dbdx,
+                                                GLuint z_start, GLint dzdx_val) {
+    int32_t init_offsets[4] = {0, 1, 2, 3};
+    int32x4_t offset = vld1q_s32(init_offsets);
+
+    int32x4_t r_vec = vmlaq_s32(vdupq_n_s32(r_start), vdupq_n_s32(drdx), offset);
+    int32x4_t g_vec = vmlaq_s32(vdupq_n_s32(g_start), vdupq_n_s32(dgdx), offset);
+    int32x4_t b_vec = vmlaq_s32(vdupq_n_s32(b_start), vdupq_n_s32(dbdx), offset);
+
+    int32x4_t stride_r = vdupq_n_s32(drdx * 4);
+    int32x4_t stride_g = vdupq_n_s32(dgdx * 4);
+    int32x4_t stride_b = vdupq_n_s32(dbdx * 4);
+
+    uint32x4_t z_vec = vmlaq_u32(vdupq_n_u32(z_start),
+                                  vreinterpretq_u32_s32(vdupq_n_s32(dzdx_val)),
+                                  vreinterpretq_u32_s32(offset));
+    uint32x4_t z_stride = vdupq_n_u32((uint32_t)(dzdx_val * 4));
+
+    uint32x4_t mask_r = vdupq_n_u32(0x00FF0000);
+    uint32x4_t mask_g = vdupq_n_u32(0x0000FF00);
+    uint32x4_t mask_b = vdupq_n_u32(0x000000FF);
+
+    while (count >= 4) {
+        uint16x4_t zbuf4 = vld1_u16(pz);
+        uint32x4_t zbuf32 = vmovl_u16(zbuf4);
+        uint32x4_t zz4 = vshrq_n_u32(z_vec, ZB_POINT_Z_FRAC_BITS);
+        uint32x4_t zmask = vcgeq_u32(zz4, zbuf32);
+
+        uint32x4_t r_masked = vandq_u32(vreinterpretq_u32_s32(r_vec), mask_r);
+        uint32x4_t g_shifted = vshrq_n_u32(vreinterpretq_u32_s32(g_vec), 8);
+        uint32x4_t g_masked = vandq_u32(g_shifted, mask_g);
+        uint32x4_t b_shifted = vshrq_n_u32(vreinterpretq_u32_s32(b_vec), 16);
+        uint32x4_t b_masked = vandq_u32(b_shifted, mask_b);
+        uint32x4_t new_pixels = vorrq_u32(vorrq_u32(r_masked, g_masked), b_masked);
+
+        uint32x4_t old_pixels = vld1q_u32((const uint32_t *)pp);
+        uint32x4_t result = vbslq_u32(zmask, new_pixels, old_pixels);
+        vst1q_u32((uint32_t *)pp, result);
+
+        /* Write z-buffer where passes (selective store via mask) */
+        uint16x4_t new_z = vmovn_u32(zz4);
+        uint16x4_t old_z = zbuf4;
+        uint16x4_t zmask16 = vmovn_u32(zmask);
+        uint16x4_t z_result = vbsl_u16(zmask16, new_z, old_z);
+        vst1_u16(pz, z_result);
+
+        r_vec = vaddq_s32(r_vec, stride_r);
+        g_vec = vaddq_s32(g_vec, stride_g);
+        b_vec = vaddq_s32(b_vec, stride_b);
+        z_vec = vaddq_u32(z_vec, z_stride);
+
+        pp += 4;
+        pz += 4;
+        count -= 4;
+    }
+
+    GLint or1 = vgetq_lane_s32(r_vec, 0);
+    GLint og1 = vgetq_lane_s32(g_vec, 0);
+    GLint ob1 = vgetq_lane_s32(b_vec, 0);
+    GLuint z = vgetq_lane_u32(z_vec, 0);
+    while (count > 0) {
+        GLuint zz = z >> ZB_POINT_Z_FRAC_BITS;
+        if (zz >= *pz) {
+            *pp = (or1 & 0xff0000) | ((og1 >> 8) & 0xff00) | ((ob1 >> 16) & 0xff);
+            *pz = (GLushort)zz;
+        }
+        z += dzdx_val;
+        or1 += drdx;
+        og1 += dgdx;
+        ob1 += dbdx;
+        pp++;
+        pz++;
+        count--;
+    }
+}
+
+/*
+ * Smooth-shaded NO-BLEND scanline with depth test, no depth write (DT1_DW0).
+ * Just direct pixel writes where Z passes. Identical to neon_smooth_dt1_scanline
+ * but called directly (no blend dispatch overhead).
+ */
+#define neon_smooth_noblend_dt1_scanline neon_smooth_dt1_scanline
+
+/*
+ * Smooth-shaded NO-BLEND scanline with depth test + depth write (DT1_DW1).
+ */
+#define neon_smooth_noblend_dt1_dw1_scanline neon_smooth_dt1_dw1_scanline
+
+/*
+ * Flat NO-BLEND scanline with depth test (DT1_DW0).
+ * Writes constant color where Z passes — branchless NEON with vbsl.
+ */
+static inline void neon_flat_noblend_dt1_scanline(PIXEL *pp, GLushort *pz,
+                                                  GLint count, GLuint color,
+                                                  GLuint z_start, GLint dzdx_val) {
+    int32_t init_offsets[4] = {0, 1, 2, 3};
+    int32x4_t offset = vld1q_s32(init_offsets);
+
+    uint32x4_t z_vec = vmlaq_u32(vdupq_n_u32(z_start),
+                                  vreinterpretq_u32_s32(vdupq_n_s32(dzdx_val)),
+                                  vreinterpretq_u32_s32(offset));
+    uint32x4_t z_stride = vdupq_n_u32((uint32_t)(dzdx_val * 4));
+    uint32x4_t color4 = vdupq_n_u32(color);
+
+    while (count >= 4) {
+        uint16x4_t zbuf4 = vld1_u16(pz);
+        uint32x4_t zbuf32 = vmovl_u16(zbuf4);
+        uint32x4_t zz4 = vshrq_n_u32(z_vec, ZB_POINT_Z_FRAC_BITS);
+        uint32x4_t zmask = vcgeq_u32(zz4, zbuf32);
+
+        uint32x4_t old_pixels = vld1q_u32((const uint32_t *)pp);
+        uint32x4_t result = vbslq_u32(zmask, color4, old_pixels);
+        vst1q_u32((uint32_t *)pp, result);
+
+        z_vec = vaddq_u32(z_vec, z_stride);
+        pp += 4;
+        pz += 4;
+        count -= 4;
+    }
+
+    GLuint z = vgetq_lane_u32(z_vec, 0);
+    while (count > 0) {
+        GLuint zz = z >> ZB_POINT_Z_FRAC_BITS;
+        if (zz >= *pz) *pp = color;
+        z += dzdx_val;
+        pp++;
+        pz++;
+        count--;
+    }
+}
+
+/*
+ * Flat NO-BLEND scanline with depth test + depth write (DT1_DW1).
+ */
+static inline void neon_flat_noblend_dt1_dw1_scanline(PIXEL *pp, GLushort *pz,
+                                                      GLint count, GLuint color,
+                                                      GLuint z_start, GLint dzdx_val) {
+    int32_t init_offsets[4] = {0, 1, 2, 3};
+    int32x4_t offset = vld1q_s32(init_offsets);
+
+    uint32x4_t z_vec = vmlaq_u32(vdupq_n_u32(z_start),
+                                  vreinterpretq_u32_s32(vdupq_n_s32(dzdx_val)),
+                                  vreinterpretq_u32_s32(offset));
+    uint32x4_t z_stride = vdupq_n_u32((uint32_t)(dzdx_val * 4));
+    uint32x4_t color4 = vdupq_n_u32(color);
+
+    while (count >= 4) {
+        uint16x4_t zbuf4 = vld1_u16(pz);
+        uint32x4_t zbuf32 = vmovl_u16(zbuf4);
+        uint32x4_t zz4 = vshrq_n_u32(z_vec, ZB_POINT_Z_FRAC_BITS);
+        uint32x4_t zmask = vcgeq_u32(zz4, zbuf32);
+
+        uint32x4_t old_pixels = vld1q_u32((const uint32_t *)pp);
+        uint32x4_t result = vbslq_u32(zmask, color4, old_pixels);
+        vst1q_u32((uint32_t *)pp, result);
+
+        uint16x4_t new_z = vmovn_u32(zz4);
+        uint16x4_t zmask16 = vmovn_u32(zmask);
+        uint16x4_t z_result = vbsl_u16(zmask16, new_z, zbuf4);
+        vst1_u16(pz, z_result);
+
+        z_vec = vaddq_u32(z_vec, z_stride);
+        pp += 4;
+        pz += 4;
+        count -= 4;
+    }
+
+    GLuint z = vgetq_lane_u32(z_vec, 0);
+    while (count > 0) {
+        GLuint zz = z >> ZB_POINT_Z_FRAC_BITS;
+        if (zz >= *pz) {
+            *pp = color;
+            *pz = (GLushort)zz;
+        }
+        z += dzdx_val;
+        pp++;
+        pz++;
+        count--;
+    }
+}
+
 #endif /* __ARM_NEON */
 #endif /* ZTRIANGLE_NEON_H */
