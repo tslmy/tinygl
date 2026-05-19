@@ -17,6 +17,10 @@
 #include "zbuffer.h"
 #include "ztriangle_variants.h"
 
+#ifdef __ARM_NEON
+#include "ztriangle_neon.h"
+#endif
+
 #if (TGL_FEATURE_RENDER_BITS != 32) && (TGL_FEATURE_RENDER_BITS != 16)
 #error "Incorrect render bits"
 #endif
@@ -85,6 +89,18 @@ void ZB_fillTriangleFlat_DT0_DW0(ZBuffer *zb,
                 ((GLuint)((p2->a >> 16) & 0xFF) << 24);                      \
     }
 
+#ifdef __ARM_NEON
+#define DRAW_LINE()                                         \
+    {                                                       \
+        register PIXEL *pp;                                 \
+        register GLint n;                                   \
+        n = (x2 >> 16) - x1;                               \
+        pp = (PIXEL *)pp1 + x1;                             \
+        if (n >= 0)                                         \
+            neon_flat_blend_scanline(pp, n + 1, color,      \
+                                    sfactor, dfactor, zbblendeq); \
+    }
+#else
 #define PUT_PIXEL(_a)                                   \
     {                                                   \
         register GLuint zz = z >> ZB_POINT_Z_FRAC_BITS; \
@@ -95,6 +111,7 @@ void ZB_fillTriangleFlat_DT0_DW0(ZBuffer *zb,
         }                                               \
         z += dzdx;                                      \
     }
+#endif
 
 #include "ztriangle.h"
 }
@@ -168,6 +185,38 @@ void ZB_fillTriangleFlat_DT1_DW0(ZBuffer *zb,
                 ((GLuint)((p2->a >> 16) & 0xFF) << 24);                      \
     }
 
+#ifdef __ARM_NEON
+#define DRAW_LINE()                                              \
+    {                                                            \
+        register PIXEL *pp;                                      \
+        register GLushort *pz;                                   \
+        register GLuint z;                                       \
+        register GLint n;                                        \
+        n = (x2 >> 16) - x1;                                    \
+        pp = (PIXEL *)pp1 + x1;                                  \
+        pz = pz1 + x1;                                           \
+        z = z1;                                                  \
+        if (n >= 0) {                                            \
+            if (sfactor == GL_SRC_ALPHA &&                        \
+                dfactor == GL_ONE_MINUS_SRC_ALPHA &&              \
+                zbblendeq == GL_FUNC_ADD) {                       \
+                neon_flat_blend_srcalpha_dt1(pp, pz, n + 1,      \
+                                            color, z, dzdx);     \
+            } else {                                             \
+                while (n >= 0) {                                  \
+                    GLuint zz = z >> ZB_POINT_Z_FRAC_BITS;        \
+                    if (zz >= *pz) {                              \
+                        TGL_BLEND_FUNC(color, (*pp))              \
+                    }                                            \
+                    z += dzdx;                                    \
+                    pp++;                                         \
+                    pz++;                                         \
+                    n--;                                          \
+                }                                                \
+            }                                                    \
+        }                                                        \
+    }
+#else
 #define PUT_PIXEL(_a)                                   \
     {                                                   \
         register GLuint zz = z >> ZB_POINT_Z_FRAC_BITS; \
@@ -178,6 +227,7 @@ void ZB_fillTriangleFlat_DT1_DW0(ZBuffer *zb,
         }                                               \
         z += dzdx;                                      \
     }
+#endif
 
 #include "ztriangle.h"
 }
@@ -410,6 +460,20 @@ void ZB_fillTriangleSmooth_DT0_DW0(ZBuffer *zb,
     {               \
     }
 
+#ifdef __ARM_NEON
+#define DRAW_LINE()                                              \
+    {                                                            \
+        register PIXEL *pp;                                      \
+        register GLint n;                                        \
+        n = (x2 >> 16) - x1;                                    \
+        pp = (PIXEL *)pp1 + x1;                                  \
+        if (n >= 0)                                              \
+            neon_smooth_blend_scanline(pp, n + 1,                \
+                                      r1, g1, b1,               \
+                                      drdx, dgdx, dbdx,         \
+                                      sfactor, dfactor, zbblendeq); \
+    }
+#else
 #define PUT_PIXEL(_a)                                        \
     {                                                        \
         register GLuint zz = z >> ZB_POINT_Z_FRAC_BITS;      \
@@ -422,6 +486,7 @@ void ZB_fillTriangleSmooth_DT0_DW0(ZBuffer *zb,
         ob1 += dbdx;                                         \
         oa1 += dadx;                                         \
     }
+#endif
 
 #include "ztriangle.h"
 }
@@ -495,6 +560,23 @@ void ZB_fillTriangleSmooth_DT1_DW0(ZBuffer *zb,
     {               \
     }
 
+#ifdef __ARM_NEON
+#define DRAW_LINE()                                              \
+    {                                                            \
+        register PIXEL *pp;                                      \
+        register GLushort *pz;                                   \
+        register GLint n;                                        \
+        n = (x2 >> 16) - x1;                                    \
+        pp = (PIXEL *)pp1 + x1;                                  \
+        pz = pz1 + x1;                                          \
+        if (n >= 0)                                              \
+            neon_smooth_blend_dt1_dispatch(pp, pz, n + 1,        \
+                                          r1, g1, b1,            \
+                                          drdx, dgdx, dbdx,     \
+                                          z1, dzdx,              \
+                                          sfactor, dfactor, zbblendeq); \
+    }
+#else
 #define PUT_PIXEL(_a)                                        \
     {                                                        \
         register GLuint zz = z >> ZB_POINT_Z_FRAC_BITS;      \
@@ -507,6 +589,7 @@ void ZB_fillTriangleSmooth_DT1_DW0(ZBuffer *zb,
         ob1 += dbdx;                                         \
         oa1 += dadx;                                         \
     }
+#endif
 
 #include "ztriangle.h"
 }
