@@ -14,4 +14,6 @@ To run this demo:
 cc -std=c99 -O2 -Iinclude -Iexamples examples/raw/alpha.c lib/libTinyGL.a -lm -o alpha && ./alpha
 ```
 
-Then find `alpha_demo.png` in your working directory.
+Then find `alpha_demo.png` in your working directory. Expected image:
+
+<img width="512" height="512" alt="alpha_demo" src="https://github.com/user-attachments/assets/fa3ae5c0-961b-40a5-899d-6684a1403a94" />
