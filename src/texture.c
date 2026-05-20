@@ -343,29 +343,59 @@ void glopTexImage2D(GLParam *p)
     GLint type = p[8].i;
     void *pixels = p[9].p;
     GLubyte *pixels1;
+    GLubyte *rgb_pixels = NULL;
     GLint do_free = 0;
-    GLint is_rgba = (format == GL_RGBA && components == 4);
+    GLint do_free_rgb = 0;
     GLContext *c = gl_get_context();
+    (void)components; (void)border;
     {
 #if TGL_HAS(ERROR_CHECK)
         if (!(c->current_texture != NULL && target == GL_TEXTURE_2D &&
-              level == 0 &&
-              ((components == 3 && format == GL_RGB) ||
-               (components == 4 && format == GL_RGBA)) &&
-              border == 0 && type == GL_UNSIGNED_BYTE))
+              level == 0 && type == GL_UNSIGNED_BYTE &&
+              (format == GL_RGB || format == GL_RGBA ||
+               format == GL_LUMINANCE || format == GL_LUMINANCE_ALPHA)))
 #define ERROR_FLAG GL_INVALID_ENUM
 #include "error_check.h"
 
 #else
         if (!(c->current_texture != NULL && target == GL_TEXTURE_2D &&
-              level == 0 &&
-              ((components == 3 && format == GL_RGB) ||
-               (components == 4 && format == GL_RGBA)) &&
-              border == 0 && type == GL_UNSIGNED_BYTE))
+              level == 0 && type == GL_UNSIGNED_BYTE &&
+              (format == GL_RGB || format == GL_RGBA ||
+               format == GL_LUMINANCE || format == GL_LUMINANCE_ALPHA)))
             gl_fatal_error(
                 "glTexImage2D: combination of parameters not handled!!");
 #endif
     }
+
+    /* Convert non-RGB/RGBA formats to RGB, extracting alpha if present */
+    if (format == GL_LUMINANCE) {
+        GLint i, n = width * height;
+        rgb_pixels = gl_malloc(n * 3);
+        GLubyte *src = (GLubyte *)pixels;
+        for (i = 0; i < n; i++) {
+            rgb_pixels[i*3+0] = src[i];
+            rgb_pixels[i*3+1] = src[i];
+            rgb_pixels[i*3+2] = src[i];
+        }
+        pixels = rgb_pixels;
+        format = GL_RGB;
+        do_free_rgb = 1;
+    } else if (format == GL_LUMINANCE_ALPHA) {
+        GLint i, n = width * height;
+        rgb_pixels = gl_malloc(n * 4);
+        GLubyte *src = (GLubyte *)pixels;
+        for (i = 0; i < n; i++) {
+            rgb_pixels[i*4+0] = src[i*2];
+            rgb_pixels[i*4+1] = src[i*2];
+            rgb_pixels[i*4+2] = src[i*2];
+            rgb_pixels[i*4+3] = src[i*2+1];
+        }
+        pixels = rgb_pixels;
+        format = GL_RGBA;
+        do_free_rgb = 1;
+    }
+
+    GLint is_rgba = (format == GL_RGBA);
     if (width != TGL_FEATURE_TEXTURE_DIM || height != TGL_FEATURE_TEXTURE_DIM) {
         GLint bpp = is_rgba ? 4 : 3;
         pixels1 = gl_malloc(TGL_FEATURE_TEXTURE_DIM * TGL_FEATURE_TEXTURE_DIM *
@@ -411,4 +441,6 @@ void glopTexImage2D(GLParam *p)
 #endif
     if (do_free)
         gl_free(pixels1);
+    if (do_free_rgb)
+        gl_free(rgb_pixels);
 }
