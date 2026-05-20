@@ -333,7 +333,7 @@ static inline void neon_smooth_blend_scanline(PIXEL *pp, GLint count,
         GLuint zbblendeq = blendeq; /* alias for TGL_BLEND_FUNC_RGB macro */
         GLint or1 = r_start, og1 = g_start, ob1 = b_start;
         while (count > 0) {
-            TGL_BLEND_FUNC_RGB(or1, og1, ob1, (*pp));
+            TGL_BLEND_FUNC_RGB(or1, og1, ob1, COLOR_MASK, (*pp));
             pp++;
             or1 += drdx;
             og1 += dgdx;
@@ -472,7 +472,7 @@ static inline void neon_smooth_blend_dt1_dispatch(PIXEL *pp, GLushort *pz,
         while (count > 0) {
             GLuint zz = z >> ZB_POINT_Z_FRAC_BITS;
             if (zz >= *pz) {
-                TGL_BLEND_FUNC_RGB(or1, og1, ob1, (*pp));
+                TGL_BLEND_FUNC_RGB(or1, og1, ob1, COLOR_MASK, (*pp));
             }
             z += dzdx_val;
             or1 += drdx;
