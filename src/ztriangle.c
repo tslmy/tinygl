@@ -519,20 +519,9 @@ void ZB_fillTriangleSmooth_DT0_DW0(ZBuffer *zb,
     {               \
     }
 
-#ifdef __ARM_NEON
-#define DRAW_LINE()                                              \
-    {                                                            \
-        register PIXEL *pp;                                      \
-        register GLint n;                                        \
-        n = (x2 >> 16) - x1;                                    \
-        pp = (PIXEL *)pp1 + x1;                                  \
-        if (n >= 0)                                              \
-            neon_smooth_blend_scanline(pp, n + 1,                \
-                                      r1, g1, b1,               \
-                                      drdx, dgdx, dbdx,         \
-                                      sfactor, dfactor, zbblendeq); \
-    }
-#else
+/* No NEON DRAW_LINE here: the scalar PUT_PIXEL path correctly uses
+ * interpolated per-vertex alpha (oa1) for blending.  The NEON fast
+ * path was incorrectly hardcoding alpha=255. */
 #define PUT_PIXEL(_a)                                        \
     {                                                        \
         register GLuint zz = z >> ZB_POINT_Z_FRAC_BITS;      \
@@ -545,7 +534,6 @@ void ZB_fillTriangleSmooth_DT0_DW0(ZBuffer *zb,
         ob1 += dbdx;                                         \
         oa1 += dadx;                                         \
     }
-#endif
 
 #include "ztriangle.h"
 }
@@ -619,23 +607,7 @@ void ZB_fillTriangleSmooth_DT1_DW0(ZBuffer *zb,
     {               \
     }
 
-#ifdef __ARM_NEON
-#define DRAW_LINE()                                              \
-    {                                                            \
-        register PIXEL *pp;                                      \
-        register GLushort *pz;                                   \
-        register GLint n;                                        \
-        n = (x2 >> 16) - x1;                                    \
-        pp = (PIXEL *)pp1 + x1;                                  \
-        pz = pz1 + x1;                                          \
-        if (n >= 0)                                              \
-            neon_smooth_blend_dt1_dispatch(pp, pz, n + 1,        \
-                                          r1, g1, b1,            \
-                                          drdx, dgdx, dbdx,     \
-                                          z1, dzdx,              \
-                                          sfactor, dfactor, zbblendeq); \
-    }
-#else
+/* No NEON DRAW_LINE: scalar path correctly uses interpolated alpha (oa1). */
 #define PUT_PIXEL(_a)                                        \
     {                                                        \
         register GLuint zz = z >> ZB_POINT_Z_FRAC_BITS;      \
@@ -648,7 +620,6 @@ void ZB_fillTriangleSmooth_DT1_DW0(ZBuffer *zb,
         ob1 += dbdx;                                         \
         oa1 += dadx;                                         \
     }
-#endif
 
 #include "ztriangle.h"
 }
