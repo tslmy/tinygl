@@ -327,6 +327,7 @@ void glopTexImage1D(GLParam *p)
 #else
 #error bad TGL_FEATURE_RENDER_BITS
 #endif
+    memset(im->alpha, 255, width * height);
     if (do_free)
         gl_free(pixels1);
 }
@@ -400,12 +401,29 @@ void glopTexImage2D(GLParam *p)
     im->xsize = width;
     im->ysize = height;
 #if TGL_FEATURE_RENDER_BITS == 32
-    if (is_rgba)
+    if (is_rgba) {
         gl_convertRGBA_to_8A8R8G8B(im->pixmap, pixels1, width, height);
-    else
+        /* Also populate the separate alpha buffer for TGL_BLEND_FUNC */
+        {
+            GLubyte *p = pixels1;
+            GLint n = width * height;
+            for (GLint i = 0; i < n; i++) {
+                im->alpha[i] = p[3];
+                p += 4;
+            }
+        }
+    } else {
         gl_convertRGB_to_8A8R8G8B(im->pixmap, pixels1, width, height);
+        memset(im->alpha, 255, width * height);
+    }
 #elif TGL_FEATURE_RENDER_BITS == 16
-    gl_convertRGB_to_5R6G5B(im->pixmap, pixels1, width, height);
+    if (is_rgba) {
+        gl_convertRGBA_to_5R6G5B_alpha(im->pixmap, im->alpha, pixels1, width,
+                                       height);
+    } else {
+        gl_convertRGB_to_5R6G5B(im->pixmap, pixels1, width, height);
+        memset(im->alpha, 255, width * height);
+    }
 #else
 #error Bad TGL_FEATURE_RENDER_BITS
 #endif

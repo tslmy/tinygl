@@ -59,6 +59,7 @@ ZBuffer *ZB_open(GLint xsize,
     }
 
     zb->current_texture = NULL;
+    zb->current_texture_alpha = NULL;
 
 #if TGL_HAS(DIRTY_RECTANGLE)
     zb->dirty_rect.valid = 0;

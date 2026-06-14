@@ -47,9 +47,10 @@
 #endif
 
 /* Texture setup */
-void ZB_setTexture(ZBuffer *zb, PIXEL *texture)
+void ZB_setTexture(ZBuffer *zb, PIXEL *texture, GLubyte *texture_alpha)
 {
     zb->current_texture = texture;
+    zb->current_texture_alpha = texture_alpha;
 }
 
 /*
@@ -74,6 +75,7 @@ void ZB_fillTriangleFlat_DT0_DW0(ZBuffer *zb,
                                  ZBufferPoint *p2)
 {
     GLuint color;
+    GLuint flat_alpha;
     TGL_BLEND_VARS
     TGL_STIPPLEVARS
 
@@ -81,8 +83,8 @@ void ZB_fillTriangleFlat_DT0_DW0(ZBuffer *zb,
 
 #define DRAW_INIT()                                                         \
     {                                                                       \
-        color = RGB_TO_PIXEL(p2->r, p2->g, p2->b) |                         \
-                ((GLuint)((p2->a >> 16) & 0xFF) << 24);                      \
+        color = RGB_TO_PIXEL(p2->r, p2->g, p2->b);                          \
+        flat_alpha = (p2->a >> 16) & 0xFF;                                   \
     }
 
 #define PUT_PIXEL(_a)                                   \
@@ -90,7 +92,7 @@ void ZB_fillTriangleFlat_DT0_DW0(ZBuffer *zb,
         register GLuint zz = z >> ZB_POINT_Z_FRAC_BITS; \
         /* DT=0: always pass depth test */              \
         if (1 STIPTEST(_a)) {                           \
-            TGL_BLEND_FUNC(color, (pp[_a]))             \
+            TGL_BLEND_FUNC(color, flat_alpha, (pp[_a])) \
             /* DW=0: no depth write */                  \
         }                                               \
         z += dzdx;                                      \
@@ -115,6 +117,7 @@ void ZB_fillTriangleFlat_DT0_DW1(ZBuffer *zb,
                                  ZBufferPoint *p2)
 {
     GLuint color;
+    GLuint flat_alpha;
     TGL_BLEND_VARS
     TGL_STIPPLEVARS
 
@@ -122,8 +125,8 @@ void ZB_fillTriangleFlat_DT0_DW1(ZBuffer *zb,
 
 #define DRAW_INIT()                                                         \
     {                                                                       \
-        color = RGB_TO_PIXEL(p2->r, p2->g, p2->b) |                         \
-                ((GLuint)((p2->a >> 16) & 0xFF) << 24);                      \
+        color = RGB_TO_PIXEL(p2->r, p2->g, p2->b);                          \
+        flat_alpha = (p2->a >> 16) & 0xFF;                                   \
     }
 
 #define PUT_PIXEL(_a)                                   \
@@ -131,7 +134,7 @@ void ZB_fillTriangleFlat_DT0_DW1(ZBuffer *zb,
         register GLuint zz = z >> ZB_POINT_Z_FRAC_BITS; \
         /* DT=0: always pass depth test */              \
         if (1 STIPTEST(_a)) {                           \
-            TGL_BLEND_FUNC(color, (pp[_a]))             \
+            TGL_BLEND_FUNC(color, flat_alpha, (pp[_a])) \
             /* DW=1: always write depth */              \
             pz[_a] = zz;                                \
         }                                               \
@@ -157,6 +160,7 @@ void ZB_fillTriangleFlat_DT1_DW0(ZBuffer *zb,
                                  ZBufferPoint *p2)
 {
     GLuint color;
+    GLuint flat_alpha;
     TGL_BLEND_VARS
     TGL_STIPPLEVARS
 
@@ -164,8 +168,8 @@ void ZB_fillTriangleFlat_DT1_DW0(ZBuffer *zb,
 
 #define DRAW_INIT()                                                         \
     {                                                                       \
-        color = RGB_TO_PIXEL(p2->r, p2->g, p2->b) |                         \
-                ((GLuint)((p2->a >> 16) & 0xFF) << 24);                      \
+        color = RGB_TO_PIXEL(p2->r, p2->g, p2->b);                          \
+        flat_alpha = (p2->a >> 16) & 0xFF;                                   \
     }
 
 #define PUT_PIXEL(_a)                                   \
@@ -173,7 +177,7 @@ void ZB_fillTriangleFlat_DT1_DW0(ZBuffer *zb,
         register GLuint zz = z >> ZB_POINT_Z_FRAC_BITS; \
         /* DT=1: test depth */                          \
         if ((zz >= pz[_a]) STIPTEST(_a)) {              \
-            TGL_BLEND_FUNC(color, (pp[_a]))             \
+            TGL_BLEND_FUNC(color, flat_alpha, (pp[_a])) \
             /* DW=0: no depth write */                  \
         }                                               \
         z += dzdx;                                      \
@@ -198,6 +202,7 @@ void ZB_fillTriangleFlat_DT1_DW1(ZBuffer *zb,
                                  ZBufferPoint *p2)
 {
     GLuint color;
+    GLuint flat_alpha;
     TGL_BLEND_VARS
     TGL_STIPPLEVARS
 
@@ -205,8 +210,8 @@ void ZB_fillTriangleFlat_DT1_DW1(ZBuffer *zb,
 
 #define DRAW_INIT()                                                         \
     {                                                                       \
-        color = RGB_TO_PIXEL(p2->r, p2->g, p2->b) |                         \
-                ((GLuint)((p2->a >> 16) & 0xFF) << 24);                      \
+        color = RGB_TO_PIXEL(p2->r, p2->g, p2->b);                          \
+        flat_alpha = (p2->a >> 16) & 0xFF;                                   \
     }
 
 #define PUT_PIXEL(_a)                                   \
@@ -214,7 +219,7 @@ void ZB_fillTriangleFlat_DT1_DW1(ZBuffer *zb,
         register GLuint zz = z >> ZB_POINT_Z_FRAC_BITS; \
         /* DT=1: test depth */                          \
         if ((zz >= pz[_a]) STIPTEST(_a)) {              \
-            TGL_BLEND_FUNC(color, (pp[_a]))             \
+            TGL_BLEND_FUNC(color, flat_alpha, (pp[_a])) \
             /* DW=1: always write depth */              \
             pz[_a] = zz;                                \
         }                                               \
@@ -832,6 +837,7 @@ void ZB_fillTriangleMappingPerspective_DT0_DW0(ZBuffer *zb,
                                                ZBufferPoint *p2)
 {
     PIXEL *texture;
+    GLubyte *texture_alpha;
     TGL_BLEND_VARS
     TGL_STIPPLEVARS
 
@@ -839,13 +845,14 @@ void ZB_fillTriangleMappingPerspective_DT0_DW0(ZBuffer *zb,
 #define INTERP_STZ
 #define INTERP_RGB
 
-#define DRAW_INIT()                    \
-    {                                  \
-        texture = zb->current_texture; \
-        fdzdx = (GLfloat) dzdx;        \
-        fndzdx = NB_INTERP * fdzdx;    \
-        ndszdx = NB_INTERP * dszdx;    \
-        ndtzdx = NB_INTERP * dtzdx;    \
+#define DRAW_INIT()                              \
+    {                                            \
+        texture = zb->current_texture;           \
+        texture_alpha = zb->current_texture_alpha; \
+        fdzdx = (GLfloat) dzdx;                  \
+        fndzdx = NB_INTERP * fdzdx;              \
+        ndszdx = NB_INTERP * dszdx;              \
+        ndtzdx = NB_INTERP * dtzdx;              \
     }
 
 #define PUT_PIXEL_TEXTURED(_a, _dt, _dw)                                      \
@@ -854,6 +861,7 @@ void ZB_fillTriangleMappingPerspective_DT0_DW0(ZBuffer *zb,
         if (1 STIPTEST(_a)) {                                                 \
             TGL_BLEND_FUNC(                                                   \
                 RGB_MIX_FUNC(or1, og1, ob1, (TEXTURE_SAMPLE(texture, s, t))), \
+                TEXTURE_SAMPLE_ALPHA(texture_alpha, s, t),                     \
                 (pp[_a]));                                                    \
         }                                                                     \
         z += dzdx;                                                            \
@@ -887,6 +895,7 @@ void ZB_fillTriangleMappingPerspective_DT0_DW1(ZBuffer *zb,
                                                ZBufferPoint *p2)
 {
     PIXEL *texture;
+    GLubyte *texture_alpha;
     TGL_BLEND_VARS
     TGL_STIPPLEVARS
 
@@ -894,13 +903,14 @@ void ZB_fillTriangleMappingPerspective_DT0_DW1(ZBuffer *zb,
 #define INTERP_STZ
 #define INTERP_RGB
 
-#define DRAW_INIT()                    \
-    {                                  \
-        texture = zb->current_texture; \
-        fdzdx = (GLfloat) dzdx;        \
-        fndzdx = NB_INTERP * fdzdx;    \
-        ndszdx = NB_INTERP * dszdx;    \
-        ndtzdx = NB_INTERP * dtzdx;    \
+#define DRAW_INIT()                              \
+    {                                            \
+        texture = zb->current_texture;           \
+        texture_alpha = zb->current_texture_alpha; \
+        fdzdx = (GLfloat) dzdx;                  \
+        fndzdx = NB_INTERP * fdzdx;              \
+        ndszdx = NB_INTERP * dszdx;              \
+        ndtzdx = NB_INTERP * dtzdx;              \
     }
 
 #define PUT_PIXEL_TEXTURED(_a, _dt, _dw)                                      \
@@ -909,6 +919,7 @@ void ZB_fillTriangleMappingPerspective_DT0_DW1(ZBuffer *zb,
         if (1 STIPTEST(_a)) {                                                 \
             TGL_BLEND_FUNC(                                                   \
                 RGB_MIX_FUNC(or1, og1, ob1, (TEXTURE_SAMPLE(texture, s, t))), \
+                TEXTURE_SAMPLE_ALPHA(texture_alpha, s, t),                     \
                 (pp[_a]));                                                    \
             pz[_a] = zz;                                                      \
         }                                                                     \
@@ -943,6 +954,7 @@ void ZB_fillTriangleMappingPerspective_DT1_DW0(ZBuffer *zb,
                                                ZBufferPoint *p2)
 {
     PIXEL *texture;
+    GLubyte *texture_alpha;
     TGL_BLEND_VARS
     TGL_STIPPLEVARS
 
@@ -950,13 +962,14 @@ void ZB_fillTriangleMappingPerspective_DT1_DW0(ZBuffer *zb,
 #define INTERP_STZ
 #define INTERP_RGB
 
-#define DRAW_INIT()                    \
-    {                                  \
-        texture = zb->current_texture; \
-        fdzdx = (GLfloat) dzdx;        \
-        fndzdx = NB_INTERP * fdzdx;    \
-        ndszdx = NB_INTERP * dszdx;    \
-        ndtzdx = NB_INTERP * dtzdx;    \
+#define DRAW_INIT()                              \
+    {                                            \
+        texture = zb->current_texture;           \
+        texture_alpha = zb->current_texture_alpha; \
+        fdzdx = (GLfloat) dzdx;                  \
+        fndzdx = NB_INTERP * fdzdx;              \
+        ndszdx = NB_INTERP * dszdx;              \
+        ndtzdx = NB_INTERP * dtzdx;              \
     }
 
 #define PUT_PIXEL_TEXTURED(_a, _dt, _dw)                                      \
@@ -965,6 +978,7 @@ void ZB_fillTriangleMappingPerspective_DT1_DW0(ZBuffer *zb,
         if ((zz >= pz[_a]) STIPTEST(_a)) {                                    \
             TGL_BLEND_FUNC(                                                   \
                 RGB_MIX_FUNC(or1, og1, ob1, (TEXTURE_SAMPLE(texture, s, t))), \
+                TEXTURE_SAMPLE_ALPHA(texture_alpha, s, t),                     \
                 (pp[_a]));                                                    \
         }                                                                     \
         z += dzdx;                                                            \
@@ -998,6 +1012,7 @@ void ZB_fillTriangleMappingPerspective_DT1_DW1(ZBuffer *zb,
                                                ZBufferPoint *p2)
 {
     PIXEL *texture;
+    GLubyte *texture_alpha;
     TGL_BLEND_VARS
     TGL_STIPPLEVARS
 
@@ -1005,13 +1020,14 @@ void ZB_fillTriangleMappingPerspective_DT1_DW1(ZBuffer *zb,
 #define INTERP_STZ
 #define INTERP_RGB
 
-#define DRAW_INIT()                    \
-    {                                  \
-        texture = zb->current_texture; \
-        fdzdx = (GLfloat) dzdx;        \
-        fndzdx = NB_INTERP * fdzdx;    \
-        ndszdx = NB_INTERP * dszdx;    \
-        ndtzdx = NB_INTERP * dtzdx;    \
+#define DRAW_INIT()                              \
+    {                                            \
+        texture = zb->current_texture;           \
+        texture_alpha = zb->current_texture_alpha; \
+        fdzdx = (GLfloat) dzdx;                  \
+        fndzdx = NB_INTERP * fdzdx;              \
+        ndszdx = NB_INTERP * dszdx;              \
+        ndtzdx = NB_INTERP * dtzdx;              \
     }
 
 #define PUT_PIXEL_TEXTURED(_a, _dt, _dw)                                      \
@@ -1020,6 +1036,7 @@ void ZB_fillTriangleMappingPerspective_DT1_DW1(ZBuffer *zb,
         if ((zz >= pz[_a]) STIPTEST(_a)) {                                    \
             TGL_BLEND_FUNC(                                                   \
                 RGB_MIX_FUNC(or1, og1, ob1, (TEXTURE_SAMPLE(texture, s, t))), \
+                TEXTURE_SAMPLE_ALPHA(texture_alpha, s, t),                     \
                 (pp[_a]));                                                    \
             pz[_a] = zz;                                                      \
         }                                                                     \

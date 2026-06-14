@@ -153,6 +153,7 @@ typedef struct GLVertex {
 
 typedef struct GLImage {
     PIXEL pixmap[TGL_FEATURE_TEXTURE_DIM * TGL_FEATURE_TEXTURE_DIM];
+    GLubyte alpha[TGL_FEATURE_TEXTURE_DIM * TGL_FEATURE_TEXTURE_DIM];
     GLint xsize, ysize;
 } GLImage;
 
@@ -423,6 +424,11 @@ void gl_convertRGBA_to_8A8R8G8B(GLuint *pixmap,
                                 GLubyte *rgba,
                                 GLint xsize,
                                 GLint ysize);
+void gl_convertRGBA_to_5R6G5B_alpha(GLushort *pixmap,
+                                    GLubyte *alpha,
+                                    GLubyte *rgba,
+                                    GLint xsize,
+                                    GLint ysize);
 void gl_resizeImage(GLubyte *dest,
                     GLint xsize_dest,
                     GLint ysize_dest,

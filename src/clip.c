@@ -464,7 +464,8 @@ void gl_draw_triangle_fill(GLVertex *p0, GLVertex *p1, GLVertex *p2)
             p0->zp.b = p2->zp.b;
         }
 #endif
-        ZB_setTexture(zb, c->current_texture->images[0].pixmap);
+        ZB_setTexture(zb, c->current_texture->images[0].pixmap,
+                      c->current_texture->images[0].alpha);
 #if TGL_HAS(BLEND)
         if (zb->enable_blend)
             func = ZB_getTriangleFunc(zb_triangle_dispatch.textured, dt, dw);

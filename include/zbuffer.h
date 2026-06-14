@@ -65,6 +65,10 @@
 #define TEXTURE_SAMPLE(texture, s, t) \
     (*(PIXEL *) ((GLbyte *) texture + ST_TO_TEXTURE_BYTE_OFFSET(s, t)))
 
+/* Sample alpha from the separate alpha buffer */
+#define TEXTURE_SAMPLE_ALPHA(alpha_buf, s, t) \
+    ((alpha_buf)[(ST_TO_TEXTURE_BYTE_OFFSET(s, t)) >> PSZSH])
+
 /* display modes */
 #define ZB_MODE_5R6G5B 1 /* true color 16 bits */
 #define ZB_MODE_INDEX 2  /* color index 8 bits */
@@ -175,14 +179,14 @@ typedef GLushort PIXEL;
 #define TGL_ALPHA_MUL(val, factor) \
     ((((val) >> 16) * ((factor) + ((factor) >> 7))) << 8)
 
-#define TGL_BLEND_FUNC(source, dest)                    \
+#define TGL_BLEND_FUNC(source, alpha8, dest)             \
     {{GLuint sr, sg, sb, dr, dg, db, sa;                \
     {                                                   \
         GLuint temp = source;                           \
         sr = GET_REDDER(temp);                          \
         sg = GET_GREENER(temp);                         \
         sb = GET_BLUEER(temp);                          \
-        sa = (temp >> 24) & 0xFF;                       \
+        sa = (alpha8);                                  \
         temp = dest;                                    \
         dr = GET_REDDER(temp);                          \
         dg = GET_GREENER(temp);                         \
@@ -290,9 +294,9 @@ typedef GLushort PIXEL;
 
 #else
 #define TGL_BLEND_VARS
-#define TGL_BLEND_FUNC(source, dest) \
-    {                                \
-        dest = source;               \
+#define TGL_BLEND_FUNC(source, alpha8, dest) \
+    {                                        \
+        dest = source;                       \
     }
 #define TGL_BLEND_FUNC_RGB(rr, gg, bb, aa, dest) \
     {                                            \
@@ -312,6 +316,7 @@ typedef struct {
     GLushort *zbuf;
     PIXEL *pbuf;
     PIXEL *current_texture;
+    GLubyte *current_texture_alpha;
 
     /* point size */
     GLfloat pointsize;
@@ -391,7 +396,7 @@ void ZB_line_z(ZBuffer *zb, ZBufferPoint *p1, ZBufferPoint *p2);
 
 /* ztriangle.c */
 
-void ZB_setTexture(ZBuffer *zb, PIXEL *texture);
+void ZB_setTexture(ZBuffer *zb, PIXEL *texture, GLubyte *texture_alpha);
 
 void ZB_fillTriangleFlat(ZBuffer *zb,
                          ZBufferPoint *p1,

@@ -216,7 +216,7 @@ void glopDrawPixels(GLParam *p)
                             if (!zbeb)
                                 pbuf[tx + ty * tw] = col;
                             else
-                                TGL_BLEND_FUNC(col, pbuf[tx + ty * tw])
+                                TGL_BLEND_FUNC(col, 255, pbuf[tx + ty * tw])
 #else
                             pbuf[tx + ty * tw] = col;
 #endif
@@ -250,7 +250,7 @@ void glopDrawPixels(GLParam *p)
                             if (!zbeb)
                                 pbuf[tx + ty * tw] = col;
                             else
-                                TGL_BLEND_FUNC(col, pbuf[tx + ty * tw])
+                                TGL_BLEND_FUNC(col, 255, pbuf[tx + ty * tw])
 #else
                             pbuf[tx + ty * tw] = col;
 #endif

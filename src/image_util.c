@@ -55,6 +55,26 @@ void gl_convertRGBA_to_8A8R8G8B(GLuint *pixmap,
 }
 
 /*
+ * Convert RGBA (4 bytes/pixel) to R5G6B5 pixmap + separate alpha buffer.
+ * Used for 16-bit mode where the pixel format has no alpha bits.
+ */
+void gl_convertRGBA_to_5R6G5B_alpha(GLushort *pixmap,
+                                    GLubyte *alpha,
+                                    GLubyte *rgba,
+                                    GLint xsize,
+                                    GLint ysize)
+{
+    GLubyte *p = rgba;
+    GLint n = xsize * ysize;
+    for (GLint i = 0; i < n; i++) {
+        pixmap[i] =
+            ((p[0] & 0xF8) << 8) | ((p[1] & 0xFC) << 3) | ((p[2] & 0xF8) >> 3);
+        alpha[i] = p[3];
+        p += 4;
+    }
+}
+
+/*
  * linear GLinterpolation with xf,yf normalized to 2^16
  */
 
